@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/topojson@3"></script>
+	<title>D3 Wage Map</title>
+</head>
+
+<body>
+  <h1>Average Wages</h1>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+    
+    async function handleData() {
+
+      const data = await d3.json('ds_salaries.json')
+      const countryData = await d3.csv('countryname.csv')
+      const countryCodes = await d3.csv('countrycodes.csv')
+
+      data.forEach(employee => {
+        for ( let country of countryData ) {
+          if ( country.country === employee.employee_residence) {
+            employee.employeelatitude = country.latitude
+            employee.employeelongitude = country.longitude
+            employee.employeecountry = country.name
+            break
+          }
+        }
+        for ( let country of countryData ) {
+          if ( country.country === employee.company_location) {
+            employee.companylatitude = country.latitude
+            employee.companylongitude = country.longitude
+            employee.companycountry = country.name
+            break
+          }
+        }
+        for ( let country of countryCodes ) {
+          // console.log(country["Alpha-2 code"], employee.employee_residence)
+
+          if ( country["Alpha-2 code"] === employee.employee_residence) {
+            employee.employeecountryid = parseInt(country["Numeric code"])
+            break
+          }
+        }
+        for ( let country of countryCodes ) {
+          if ( country["Alpha-2 code"] === employee.company_location) {
+            employee.companycountryid = parseInt(country["Numeric code"])
+            return
+          }
+        }
+      });
+
+      const getCountryByEmployees = data.reduce((acc, obj) => {
+        if ( acc[obj.employeecountryid] === undefined ){
+          acc[obj.employeecountryid] = {
+            countryName: obj.employeecountry,
+            count: 1,
+            wages: obj.salary_in_usd,
+            latitude: obj.employeelatitude,
+            longitude: obj.employeelongitude,
+            countryId: obj.employeecountryid,
+            countryCode: obj.employee_residence,
+          }
+        } else {
+          acc[obj.employeecountryid].count += 1
+          acc[obj.employeecountryid].wages += obj.salary_in_usd 
+        }
+        return acc
+      }, {})
+
+      for (let key in getCountryByEmployees) {
+        getCountryByEmployees[key].averageWage = getCountryByEmployees[key].wages / getCountryByEmployees[key].count
+      }
+
+      console.log(getCountryByEmployees)
+      
+
+
+      const margin = { top: 20, right: 20, bottom: 10, left: 40 }
+      const width = 1100 - (margin.left + margin.right)
+      const height = 650 - (margin.top + margin.bottom)
+
+      const svg = d3.select('body')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+      const projection = d3.geoMercator()
+
+      const path = d3.geoPath()
+        .projection(projection);
+
+      const g = svg.append('g');
+
+      // extents for opacity from 0 to max count of country
+      // range is 0 - 1 for opacity
+
+      
+
+      async function loadMap() {
+        // load and display the World
+        const topology = await d3.json('world-110m2.json')
+        g.selectAll('path')
+          // Use topojson here to extract the topology from the map data
+          .data(topojson.feature(topology, topology.objects.countries).features)
+          .enter()
+          .append('path')
+          .attr('d', d => {
+            // console.log(d)
+            return path(d)
+          })
+          .attr('fill', d => {
+            // console.log(d.id)
+            // console.log(getCountryByEmployees["4"])
+            if (getCountryByEmployees[d.id] !== undefined) {
+              // console.log(d.id, getCountryByEmployees[d.id].latitude, getCountryByEmployees[d.id].longitude)
+              const alpha = getCountryByEmployees[d.id].averageWage / 150000
+              return `hsla(240, 100%, 30%, ${alpha})`
+            }
+            return "white"
+          })
+          // .attr('fill', (d, i) => `hsl(${360 / 176 * i}, 70%, 50%)`)
+          .attr('stroke', 'black')
+          .attr('stroke-width', 0.25)
+          .attr("id", d => d.id)
+      }
+
+      d3.select('svg')
+        .selectAll('circle')
+        .data(getCountryByEmployees)
+        .enter()
+        .append('circle')
+        // Position the circles using geo coords and porjection
+        .attr('cx', getCountryByEmployees => projection([d.longitude, d.latitude])[0])
+        .attr('cy', getCountryByEmployees => projection([d.longitude, d.latitude])[1])
+        // Style the circles 
+        .attr('r', 10)
+        .attr('fill', 'rgba(255, 0, 0, 0.15)')
+
+
+
+
+      const title = svg
+        .append('g')
+
+      title
+        .append('text')
+        .text('Avg Wages in USD of Devs in the World')
+        .attr('transform', `translate(${width / 2 - 150}, 400)`)
+        .attr('class', 'labelText')
+
+      title
+        .append('text')
+        .text('Highest Wages are found in the US @ $150 000')
+        .attr('transform', `translate(${width / 2 - 175}, 420)`)
+        .attr('class', 'labelText')
+
+      loadMap()
+
+      }
+
+      handleData()
+			
+    </script>
+  </body>
+</html> 
