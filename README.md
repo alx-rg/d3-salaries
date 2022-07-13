@@ -9,3 +9,7 @@ This d3 visualization is intended to create some visuals with the Data Science J
 ## To Visualize
 
 You can open first in VS Code, and then start a Live Server
+
+[Viz1](https://alx-rg.github.io/d3-salaries/index.html)
+[Viz2](https://alx-rg.github.io/d3-salaries/worldmap.html)
+[Viz3](https://alx-rg.github.io/d3-salaries/averageWages.html)
